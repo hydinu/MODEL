@@ -1,0 +1,7 @@
+flask>=3.0.0
+gunicorn>=21.2.0
+pymongo>=4.6.0
+python-dotenv>=1.0.0
+flask-cors>=4.0.0
+marshmallow>=3.20.0
+requests>=2.31.0

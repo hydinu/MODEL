@@ -1,0 +1,142 @@
+version: "3.9"
+
+# =============================================================================
+# Crowd Detection — Production Docker Compose
+# Services: api · detector · ml · mongodb · nginx
+# =============================================================================
+
+networks:
+  crowd_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  model_weights:
+  heatmap_frames:
+  logs:
+
+services:
+
+  # ── MongoDB ─────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: crowd_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - crowd_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Flask REST API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: crowd_api
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@mongodb:27017/${MONGO_DB}?authSource=admin
+      MONGO_DB: ${MONGO_DB}
+      FLASK_ENV: ${FLASK_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY}
+      ALERT_THRESHOLD: ${ALERT_THRESHOLD:-10}
+      ML_SERVICE_URL: http://ml:5001
+    volumes:
+      - logs:/app/logs
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - crowd_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Detector Worker (OpenCV + YOLOv8) ────────────────────────────────────────
+  detector:
+    build:
+      context: ./services/detector
+      dockerfile: Dockerfile
+    container_name: crowd_detector
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@mongodb:27017/${MONGO_DB}?authSource=admin
+      MONGO_DB: ${MONGO_DB}
+      CAMERA_INDEX: ${CAMERA_INDEX:-0}
+      ALERT_THRESHOLD: ${ALERT_THRESHOLD:-10}
+      PUBLISH_INTERVAL: ${PUBLISH_INTERVAL:-30}
+      MODEL_PATH: ${MODEL_PATH:-yolov8n.pt}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.40}
+    volumes:
+      - model_weights:/app/weights
+      - heatmap_frames:/app/heatmaps
+      - logs:/app/logs
+    devices:
+      - /dev/video0:/dev/video0
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - crowd_net
+    # webcam requires host network mode on Linux; use host if camera not visible
+    # network_mode: host
+
+  # ── ML Microservice (LSTM + RF predictions) ───────────────────────────────────
+  ml:
+    build:
+      context: ./services/ml
+      dockerfile: Dockerfile
+    container_name: crowd_ml
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@mongodb:27017/${MONGO_DB}?authSource=admin
+      MONGO_DB: ${MONGO_DB}
+      MODEL_SAVE_PATH: /app/models/saved
+      SEQ_LEN: ${SEQ_LEN:-20}
+    volumes:
+      - model_weights:/app/models/saved
+      - logs:/app/logs
+    ports:
+      - "5001:5001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - crowd_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: crowd_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+      - ml
+    networks:
+      - crowd_net

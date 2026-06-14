@@ -1,0 +1,18 @@
+# Core vision / ML
+opencv-python>=4.9.0
+ultralytics>=8.2.0       # Includes YOLOv8; auto-downloads yolov8n.pt on first run
+
+# Ultralytics hard dependencies (usually pulled in automatically)
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Utilities (already present in most envs, listed for completeness)
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Analytics (used by analyse.py and predict.py)
+pandas>=2.0.0
+matplotlib>=3.8.0
+scikit-learn>=1.4.0
+tensorflow>=2.16.0         # required by predict_lstm.py  (CPU build)
+# GPU build: pip install tensorflow[and-cuda]
