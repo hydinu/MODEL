@@ -29,8 +29,7 @@ class Camera:
                 self._cap = cv2.VideoCapture(index)
 
         if not self._cap.isOpened():
-            sys.exit(f"[ERROR] Cannot open camera ({index}). "
-                     "Check that the webcam/stream is connected and not in use.")
+            raise RuntimeError(f"Cannot open camera ({index}). Check that the webcam/stream is connected and not in use.")
 
         # Request resolution (driver may clamp to nearest supported size)
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_WIDTH)

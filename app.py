@@ -142,11 +142,8 @@ if st.session_state.running:
                 # Small delay to reduce CPU load when frame rate is high
                 time.sleep(0.01)
                 
-    except SystemExit:
-        st.error("Error: The camera application exited abnormally.")
-        st.session_state.running = False
     except Exception as e:
-        st.error(f"Error occurred during loop: {e}")
+        st.error(f"Error: {e}")
         st.session_state.running = False
 else:
     st.info("System is offline. Click 'Start Detection' to launch the webcam feed.")
