@@ -21,8 +21,12 @@ class Camera:
             # Network stream or video file (e.g., http://... or rtsp://...)
             self._cap = cv2.VideoCapture(index)
         else:
-            # Local USB camera
-            self._cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)   # CAP_DSHOW = faster on Windows
+            # Local USB camera - try CAP_DSHOW first (faster on Windows)
+            self._cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+            if not self._cap.isOpened():
+                # Fallback to default backend if CAP_DSHOW fails
+                self._cap.release()
+                self._cap = cv2.VideoCapture(index)
 
         if not self._cap.isOpened():
             sys.exit(f"[ERROR] Cannot open camera ({index}). "
