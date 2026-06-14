@@ -16,3 +16,6 @@ matplotlib>=3.8.0
 scikit-learn>=1.4.0
 tensorflow>=2.16.0         # required by predict_lstm.py  (CPU build)
 # GPU build: pip install tensorflow[and-cuda]
+
+# Web Interface
+streamlit>=1.30.0

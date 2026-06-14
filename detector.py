@@ -52,14 +52,15 @@ class PersonDetector:
         print("[Detector] Model ready.")
 
     # ── Public API ───────────────────────────────────────────────────────────
-    def detect(self, frame: np.ndarray) -> List[Detection]:
+    def detect(self, frame: np.ndarray, conf: float | None = None) -> List[Detection]:
         """
         Run inference on *frame* (BGR, HWC uint8) and return a list of
         :class:`Detection` objects, one per detected person.
         """
+        conf_val = conf if conf is not None else CONFIDENCE_THRESHOLD
         results = self._model.predict(
             source=frame,
-            conf=CONFIDENCE_THRESHOLD,
+            conf=conf_val,
             iou=IOU_THRESHOLD,
             classes=[PERSON_CLASS_ID],  # Filter to persons only inside YOLO
             verbose=self._verbose,
